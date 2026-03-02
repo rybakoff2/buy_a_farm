@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Уговори старика</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="game-container">
+        <h1 class="game-title">🌾 Уговори продать тебе ферму за 18 дней🌾</h1>
+        
+        <!-- Верхняя панель -->
+        <div class="top-panel">
+            <div class="stats">
+<div class="day-counter">День: <span id="day">1</span>/18</div>
+                <div class="score-counter" id="scoreDisplay">
+                    <span>Доверие:</span>
+                    <span id="score">0</span>/50
+                </div>
+            </div>
+            
+            <!-- Шкала доверия -->
+            <div class="trust-meter">
+                <div class="meter-label">
+                    <span>😠 Недоверие</span>
+                    <span class="handshake">🤝 Сделка</span>
+                </div>
+                <div class="meter-container">
+                    <div class="meter-fill" id="trustFill" style="width: 0%"></div>
+                    <div class="farmer-icon" id="farmerIcon">👨‍🌾</div>
+                </div>
+            </div>
+            
+            <div class="sun-container">
+                <div class="celestial-body" id="celestialBody">
+                    <div class="sun-layer" id="sunLayer">☀️</div>
+                    <div class="moon-layer" id="moonLayer">🌙</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Основная область с диалогами -->
+        <div class="dialog-area">
+            <div class="character-info">
+                <span class="character-emoji">👴</span>
+                <span class="character-name">Старый хозяин:</span>
+            </div>
+            <div class="dialog-text" id="dialogText">
+                Добро пожаловать на мою ферму! Я уже стар, ищу того, кто продолжит моё дело.
+            </div>
+        </div>
+        
+        <!-- Область с вариантами ответов -->
+        <div class="choices-area" id="choicesArea">
+            <button class="choice-btn" data-score="1">Расскажите о ферме</button>
+            <button class="choice-btn" data-score="2">Сколько стоит ферма?</button>
+            <button class="choice-btn" data-score="3">Я готов купить сразу!</button>
+        </div>
+        
+        <!-- Сообщение о конце игры -->
+        <div class="game-over" id="gameOver" style="display: none;">
+            <h2 id="gameOverMessage">Игра окончена!</h2>
+            <button class="restart-btn" onclick="location.reload()">Начать заново</button>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
