@@ -1,12 +1,27 @@
 // Глобальные переменные
 let currentDay = 1;
 let currentScore = 0;
-const MAX_DAYS = 18;        // 18 дней
-const WIN_SCORE = 50;       // нужно 50 баллов
+const MAX_DAYS = 18;
+const WIN_SCORE = 50;
 let gameActive = true;
 let canAnswer = true;
 let sunInterval = null;
-let dayEndTimeout = null;
+
+// Кэшируем элементы DOM один раз
+const elements = {
+    daySpan: document.getElementById('day'),
+    scoreSpan: document.getElementById('score'),
+    trustFill: document.getElementById('trustFill'),
+    farmerIcon: document.getElementById('farmerIcon'),
+    dialogText: document.getElementById('dialogText'),
+    choicesArea: document.getElementById('choicesArea'),
+    gameOverDiv: document.getElementById('gameOver'),
+    gameOverMessage: document.getElementById('gameOverMessage'),
+    meterContainer: document.querySelector('.meter-container'),
+    celestialBody: document.getElementById('celestialBody'),
+    sunLayer: document.getElementById('sunLayer'),
+    moonLayer: document.getElementById('moonLayer'),
+};
 
 // Хитрые диалоги
 const dialogs = [
@@ -164,273 +179,193 @@ const reactionEmojis = {
     '3': '😊'
 };
 
-// Элементы DOM
-const celestialBody = document.getElementById('celestialBody');
-const sunLayer = document.getElementById('sunLayer');
-const moonLayer = document.getElementById('moonLayer');
-const daySpan = document.getElementById('day');
-const scoreSpan = document.getElementById('score');
-const trustFill = document.getElementById('trustFill');
-const farmerIcon = document.getElementById('farmerIcon');
-const dialogText = document.getElementById('dialogText');
-const choicesArea = document.getElementById('choicesArea');
-const gameOverDiv = document.getElementById('gameOver');
-const gameOverMessage = document.getElementById('gameOverMessage');
-
-// Очистка всех таймеров
+// Очистка таймеров
 function clearAllTimers() {
     if (sunInterval) {
         clearInterval(sunInterval);
         sunInterval = null;
     }
-    if (dayEndTimeout) {
-        clearTimeout(dayEndTimeout);
-        dayEndTimeout = null;
-    }
 }
 
 // Обновление отображения
 function updateDisplay() {
-    if (daySpan) daySpan.textContent = currentDay;
-    if (scoreSpan) scoreSpan.textContent = currentScore;
-    
-    // Обновляем текст с максимальными днями
-    const dayCounter = document.querySelector('.day-counter');
-    if (dayCounter) {
-        dayCounter.innerHTML = `День: <span id="day">${currentDay}</span>/${MAX_DAYS}`;
-    }
-    
-    // Шкала доверия
+    elements.daySpan.textContent = currentDay;
+    elements.scoreSpan.textContent = currentScore;
+
     let displayScore = Math.max(0, currentScore);
     let percentage = (displayScore / WIN_SCORE) * 100;
-    if (trustFill) {
-        trustFill.style.width = Math.min(percentage, 100) + '%';
-    }
-    
-    // Позиция фермера
-    const meterContainer = document.querySelector('.meter-container');
-    if (meterContainer && farmerIcon) {
-        const containerWidth = meterContainer.offsetWidth - 40;
-        let farmerPos = (displayScore / WIN_SCORE) * containerWidth;
-        farmerPos = Math.max(0, Math.min(farmerPos, containerWidth));
-        farmerIcon.style.left = farmerPos + 'px';
-    }
-    
-    // Выражение лица фермера
-    if (farmerIcon) {
-        const progress = (currentScore / WIN_SCORE) * 100;
-        if (progress >= 90) farmerIcon.textContent = '👨‍🌾🤝';
-        else if (progress >= 60) farmerIcon.textContent = '👨‍🌾😊';
-        else if (progress >= 30) farmerIcon.textContent = '👨‍🌾😐';
-        else if (progress >= 0) farmerIcon.textContent = '👨‍🌾😠';
-        else farmerIcon.textContent = '👨‍🌾💢';
-    }
-    
-    // Проверка победы
-    if (currentScore >= WIN_SCORE) {
-        endGame('win');
-    }
+    elements.trustFill.style.width = Math.min(percentage, 100) + '%';
+
+    const containerWidth = elements.meterContainer.offsetWidth - 40;
+    let farmerPos = (displayScore / WIN_SCORE) * containerWidth;
+    farmerPos = Math.max(0, Math.min(farmerPos, containerWidth));
+    elements.farmerIcon.style.left = farmerPos + 'px';
+
+    const progress = (currentScore / WIN_SCORE) * 100;
+    if      (progress >= 90) elements.farmerIcon.textContent = '👨‍🌾🤝';
+    else if (progress >= 60) elements.farmerIcon.textContent = '👨‍🌾😊';
+    else if (progress >= 30) elements.farmerIcon.textContent = '👨‍🌾😐';
+    else if (progress >= 0)  elements.farmerIcon.textContent = '👨‍🌾😠';
+    else                     elements.farmerIcon.textContent = '👨‍🌾💢';
 }
 
 // Показ реакции
 function showReaction(score) {
-    const oldReaction = document.querySelector('.reaction-emoji');
-    if (oldReaction) oldReaction.remove();
-    
+    const old = document.querySelector('.reaction-emoji');
+    if (old) old.remove();
+
     const reaction = document.createElement('div');
     reaction.className = 'reaction-emoji';
-    reaction.textContent = reactionEmojis[score.toString()] || '😐';
+    reaction.textContent = reactionEmojis[score] || '😐';
     document.querySelector('.dialog-area').appendChild(reaction);
-    
-    setTimeout(() => {
-        if (reaction.parentNode) reaction.remove();
-    }, 2000);
+
+    setTimeout(() => reaction.remove(), 2000);
 }
 
-// Запуск солнца (10 секунд)
+// Анимация солнца (10 секунд на день)
 function startSun() {
     clearAllTimers();
-    
-    let sunPos = 0;
+
     const startTime = Date.now();
     const dayDuration = 10000; // 10 секунд
-    
-    // Анимация солнца
+
     sunInterval = setInterval(() => {
         if (!gameActive) {
-            clearInterval(sunInterval);
+            clearAllTimers();
             return;
         }
-        
+
         const elapsed = Date.now() - startTime;
-        sunPos = Math.min((elapsed / dayDuration) * 100, 100);
-        
-        // Движение
+        let sunPos = Math.min((elapsed / dayDuration) * 100, 100);
+
         const container = document.querySelector('.sun-container');
-        if (!container || !celestialBody) return;
-        
-        const maxLeft = container.offsetWidth - celestialBody.offsetWidth;
+        const maxLeft = container.offsetWidth - elements.celestialBody.offsetWidth;
         const left = (sunPos / 100) * maxLeft;
-        celestialBody.style.left = Math.min(left, maxLeft) + 'px';
-        
-        // Превращение в луну
-        if (sunLayer && moonLayer) {
-            if (sunPos < 70) {
-                sunLayer.style.opacity = 1;
-                moonLayer.style.opacity = 0;
-            } else if (sunPos < 85) {
-                let progress = (sunPos - 70) / 15;
-                sunLayer.style.opacity = 1 - progress;
-                moonLayer.style.opacity = progress;
-            } else {
-                sunLayer.style.opacity = 0;
-                moonLayer.style.opacity = 1;
-            }
+        elements.celestialBody.style.left = Math.min(left, maxLeft) + 'px';
+
+        if (sunPos < 70) {
+            elements.sunLayer.style.opacity = 1;
+            elements.moonLayer.style.opacity = 0;
+        } else if (sunPos < 85) {
+            let p = (sunPos - 70) / 15;
+            elements.sunLayer.style.opacity = 1 - p;
+            elements.moonLayer.style.opacity = p;
+        } else {
+            elements.sunLayer.style.opacity = 0;
+            elements.moonLayer.style.opacity = 1;
         }
-        
-        // Конец дня
+
         if (sunPos >= 100) {
-            clearInterval(sunInterval);
-            sunInterval = null;
-            if (gameActive) {
-                endDay();
-            }
-        }
-    }, 50);
-    
-    // Резервный таймер
-    dayEndTimeout = setTimeout(() => {
-        if (gameActive && sunInterval) {
-            clearInterval(sunInterval);
-            sunInterval = null;
+            clearAllTimers();
             endDay();
         }
-    }, dayDuration + 100);
+    }, 40);
 }
 
-// Создание кнопок
+// Создание кнопок выбора
 function createButtons() {
-    if (!choicesArea || !dialogText) return;
-    
-    choicesArea.innerHTML = '';
+    elements.choicesArea.innerHTML = '';
     canAnswer = true;
-    
-    // Выбираем диалог по текущему дню (зацикливаем если дней больше чем диалогов)
+
     const dialogIndex = (currentDay - 1) % dialogs.length;
     const dialog = dialogs[dialogIndex];
-    dialogText.textContent = dialog.text;
-    
-    // Создаем кнопки для каждого варианта ответа
+    elements.dialogText.textContent = dialog.text;
+
     dialog.choices.forEach(choice => {
         const btn = document.createElement('button');
         btn.className = 'choice-btn';
         btn.textContent = choice.text;
         btn.onclick = () => {
             if (!gameActive || !canAnswer) return;
-            
-            // Начисляем баллы
-            currentScore += choice.score;
             canAnswer = false;
-            
-            // Обновляем интерфейс
+
+            currentScore += choice.score;
             updateDisplay();
             showReaction(choice.score);
-            
-            // Блокируем кнопки
-            document.querySelectorAll('.choice-btn').forEach(b => b.disabled = true);
-            
-            // Показываем реакцию старика
+
             if (choice.score === 3) {
-                dialogText.textContent = "✨ Старик широко улыбается! Ему очень нравится ваш ответ!";
+                elements.dialogText.textContent = "✨ Старик широко улыбается! Ему очень нравится ваш ответ!";
             } else if (choice.score === 2) {
-                dialogText.textContent = "👴 Старик кивает. Неплохой ответ.";
+                elements.dialogText.textContent = "👴 Старик кивает. Неплохой ответ.";
             } else if (choice.score === 1) {
-                dialogText.textContent = "🤔 Старик задумался. Приемлемо.";
+                elements.dialogText.textContent = "🤔 Старик задумался. Приемлемо.";
             } else if (choice.score === -1) {
-                dialogText.textContent = "😒 Старик хмурится. Ответ ему не понравился...";
+                elements.dialogText.textContent = "😒 Старик хмурится. Ответ ему не понравился...";
             }
-            
-            // Останавливаем солнце и завершаем день
+
+            document.querySelectorAll('.choice-btn').forEach(b => b.disabled = true);
+
             clearAllTimers();
-            
+
             setTimeout(() => {
-                if (gameActive) {
-                    endDay();
-                }
-            }, 1500);
+                if (gameActive) endDay();
+            }, 1400);
         };
-        btn.disabled = false;
-        choicesArea.appendChild(btn);
+        elements.choicesArea.appendChild(btn);
     });
 }
 
-// Конец дня
+// Завершение дня
 function endDay() {
     clearAllTimers();
-    
-    // Штраф за молчание
+
     if (canAnswer && gameActive) {
         currentScore -= 1;
-        dialogText.textContent = "😠 Старик ждал ответа, но вы промолчали... Он разочарован.";
+        elements.dialogText.textContent = "😠 Старик ждал ответа, но вы промолчали... Он разочарован.";
         updateDisplay();
     }
-    
-    // Следующий день
+
     currentDay++;
     updateDisplay();
-    
-    // Проверка на конец игры
+
     if (currentDay > MAX_DAYS) {
         endGame('lose');
         return;
     }
-    
-    // Запускаем следующий день через 2 секунды
+
+    if (currentScore >= WIN_SCORE) {
+        endGame('win');
+        return;
+    }
+
     setTimeout(() => {
         if (gameActive) {
             createButtons();
             startSun();
         }
-    }, 2000);
+    }, 900);
 }
 
 // Конец игры
 function endGame(result) {
     gameActive = false;
     clearAllTimers();
-    
-    if (gameOverMessage && gameOverDiv) {
-        if (result === 'win' || currentScore >= WIN_SCORE) {
-            gameOverMessage.innerHTML = "🎉 СДЕЛКА! 🎉<br><br>Старик пожимает вам руку! Ферма ваша!";
-        } else {
-            gameOverMessage.innerHTML = "😔 Старик разочарован...<br><br>Дни прошли, и он продал ферму другому.";
-        }
-        
-        gameOverDiv.style.display = 'block';
+
+    if (result === 'win' || currentScore >= WIN_SCORE) {
+        elements.gameOverMessage.innerHTML = "🎉 СДЕЛКА! 🎉<br><br>Старик пожимает вам руку! Ферма ваша!";
+    } else {
+        elements.gameOverMessage.innerHTML = "😔 Старик разочарован...<br><br>Дни прошли, и он продал ферму другому.";
     }
+
+    elements.gameOverDiv.style.display = 'block';
 }
 
 // Старт игры
 function startGame() {
     clearAllTimers();
-    
     gameActive = true;
     currentDay = 1;
     currentScore = 0;
     canAnswer = true;
-    
-    // Скрываем окно окончания игры если оно было показано
-    if (gameOverDiv) {
-        gameOverDiv.style.display = 'none';
+
+    if (elements.gameOverDiv) {
+        elements.gameOverDiv.style.display = 'none';
     }
-    
-    // Обновляем отображение
+
     updateDisplay();
-    
-    // Создаем кнопки и запускаем солнце
     createButtons();
     startSun();
 }
 
-// Запуск игры при загрузке страницы
+// Запуск при загрузке страницы
 window.onload = startGame;
